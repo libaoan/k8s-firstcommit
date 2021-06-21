@@ -16,7 +16,8 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/fsouza/go-dockerclient"
-	"gopkg.in/v1/yaml"
+	//"gopkg.in/v1/yaml"
+	"gopkg.in/yaml.v2"
 	"k8s-firstcommit/pkg/api"
 	"k8s-firstcommit/pkg/registry"
 	"k8s-firstcommit/pkg/util"
