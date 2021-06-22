@@ -2,28 +2,27 @@ package registry
 
 import (
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"testing"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
 func TestSyncEndpointsEmpty(t *testing.T) {
-	serviceRegistry := pkg.MockServiceRegistry{}
-	taskRegistry := pkg.MockTaskRegistry{}
+	serviceRegistry := MockServiceRegistry{}
+	taskRegistry := MockTaskRegistry{}
 
-	endpoints := pkg.MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 }
 
 func TestSyncEndpointsError(t *testing.T) {
-	serviceRegistry := pkg.MockServiceRegistry{
+	serviceRegistry := MockServiceRegistry{
 		err: fmt.Errorf("Test Error"),
 	}
-	taskRegistry := pkg.MockTaskRegistry{}
+	taskRegistry := MockTaskRegistry{}
 
-	endpoints := pkg.MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	if err != serviceRegistry.err {
 		t.Errorf("Errors don't match: %#v %#v", err, serviceRegistry.err)
@@ -31,10 +30,10 @@ func TestSyncEndpointsError(t *testing.T) {
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
-	serviceRegistry := pkg.MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
-				Service{
+	serviceRegistry := MockServiceRegistry{
+		list: api.ServiceList{
+			Items: []api.Service{
+				api.Service{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -42,15 +41,15 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := pkg.MockTaskRegistry{
-		tasks: []Task{
-			Task{
-				DesiredState: TaskState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
-							Container{
-								Ports: []Port{
-									Port{
+	taskRegistry := MockTaskRegistry{
+		tasks: []api.Task{
+			api.Task{
+				DesiredState: api.TaskState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							api.Container{
+								Ports: []api.Port{
+									api.Port{
 										HostPort: 8080,
 									},
 								},
@@ -62,19 +61,19 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 
-	endpoints := pkg.MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 	if len(serviceRegistry.endpoints.Endpoints) != 1 {
 		t.Errorf("Unexpected endpoints update: %#v", serviceRegistry.endpoints)
 	}
 }
 
 func TestSyncEndpointsTaskError(t *testing.T) {
-	serviceRegistry := pkg.MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
-				Service{
+	serviceRegistry := MockServiceRegistry{
+		list: api.ServiceList{
+			Items: []api.Service{
+				api.Service{
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -82,11 +81,11 @@ func TestSyncEndpointsTaskError(t *testing.T) {
 			},
 		},
 	}
-	taskRegistry := pkg.MockTaskRegistry{
+	taskRegistry := MockTaskRegistry{
 		err: fmt.Errorf("test error."),
 	}
 
-	endpoints := pkg.MakeEndpointController(&serviceRegistry, &taskRegistry)
+	endpoints := MakeEndpointController(&serviceRegistry, &taskRegistry)
 	err := endpoints.SyncServiceEndpoints()
 	if err == nil {
 		t.Error("Unexpected non-error")

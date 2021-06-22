@@ -3,14 +3,13 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
-	. "k8s-firstcommit/pkg/api"
-	. "k8s-firstcommit/pkg/client"
+	"k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/client"
 	"k8s-firstcommit/pkg/util"
 )
 
@@ -22,11 +21,11 @@ func makeUrl(suffix string) string {
 }
 
 type FakeTaskControl struct {
-	controllerSpec []ReplicationController
+	controllerSpec []api.ReplicationController
 	deleteTaskID   []string
 }
 
-func (f *FakeTaskControl) createReplica(spec ReplicationController) {
+func (f *FakeTaskControl) createReplica(spec api.ReplicationController) {
 	f.controllerSpec = append(f.controllerSpec, spec)
 }
 
@@ -35,15 +34,15 @@ func (f *FakeTaskControl) deleteTask(taskID string) error {
 	return nil
 }
 
-func makeReplicationController(replicas int) ReplicationController {
-	return ReplicationController{
-		DesiredState: ReplicationControllerState{
+func makeReplicationController(replicas int) api.ReplicationController {
+	return api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
 			Replicas: replicas,
-			TaskTemplate: TaskTemplate{
-				DesiredState: TaskState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
-							Container{
+			TaskTemplate: api.TaskTemplate{
+				DesiredState: api.TaskState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							api.Container{
 								Image: "foo/bar",
 							},
 						},
@@ -58,16 +57,16 @@ func makeReplicationController(replicas int) ReplicationController {
 	}
 }
 
-func makeTaskList(count int) TaskList {
-	tasks := []Task{}
+func makeTaskList(count int) api.TaskList {
+	tasks := []api.Task{}
 	for i := 0; i < count; i++ {
-		tasks = append(tasks, Task{
-			JSONBase: JSONBase{
+		tasks = append(tasks, api.Task{
+			JSONBase: api.JSONBase{
 				ID: fmt.Sprintf("task%d", i),
 			},
 		})
 	}
-	return TaskList{
+	return api.TaskList{
 		Items: tasks,
 	}
 }
@@ -88,13 +87,13 @@ func TestSyncReplicationControllerDoesNothing(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 
 	controllerSpec := makeReplicationController(2)
@@ -110,13 +109,13 @@ func TestSyncReplicationControllerDeletes(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 
 	controllerSpec := makeReplicationController(1)
@@ -132,13 +131,13 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 
 	controllerSpec := makeReplicationController(2)
@@ -154,21 +153,21 @@ func TestCreateReplica(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
-	taskControl := pkg.RealTaskControl{
+	taskControl := RealTaskControl{
 		kubeClient: client,
 	}
 
-	controllerSpec := ReplicationController{
-		DesiredState: ReplicationControllerState{
-			TaskTemplate: TaskTemplate{
-				DesiredState: TaskState{
-					Manifest: ContainerManifest{
-						Containers: []Container{
-							Container{
+	controllerSpec := api.ReplicationController{
+		DesiredState: api.ReplicationControllerState{
+			TaskTemplate: api.TaskTemplate{
+				DesiredState: api.TaskState{
+					Manifest: api.ContainerManifest{
+						Containers: []api.Container{
+							api.Container{
 								Image: "foo/bar",
 							},
 						},
@@ -199,18 +198,18 @@ func TestHandleWatchResponseNotSet(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "delete",
 	})
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 }
 
 func TestHandleWatchResponseNoNode(t *testing.T) {
@@ -220,13 +219,13 @@ func TestHandleWatchResponseNoNode(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
@@ -243,13 +242,13 @@ func TestHandleWatchResponseBadData(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 	_, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
@@ -269,19 +268,19 @@ func TestHandleWatchResponse(t *testing.T) {
 		ResponseBody: string(body),
 	}
 	testServer := httptest.NewTLSServer(&fakeHandler)
-	client := Client{
+	client := client.Client{
 		Host: testServer.URL,
 	}
 
 	fakeTaskControl := FakeTaskControl{}
 
-	manager := pkg.MakeReplicationManager(nil, &client)
+	manager := MakeReplicationManager(nil, &client)
 	manager.taskControl = &fakeTaskControl
 
 	controller := makeReplicationController(2)
 
 	data, err := json.Marshal(controller)
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 	controllerOut, err := manager.handleWatchResponse(&etcd.Response{
 		Action: "set",
 		Node: &etcd.Node{

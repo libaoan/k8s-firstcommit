@@ -1,23 +1,22 @@
 package registry
 
 import (
-	"k8s-firstcommit/pkg"
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
 type ManifestFactory interface {
 	// Make a container object for a given task, given the machine that the task is running on.
-	MakeManifest(machine string, task Task) (ContainerManifest, error)
+	MakeManifest(machine string, task api.Task) (api.ContainerManifest, error)
 }
 
 type BasicManifestFactory struct {
-	serviceRegistry pkg.ServiceRegistry
+	serviceRegistry ServiceRegistry
 }
 
-func (b *BasicManifestFactory) MakeManifest(machine string, task Task) (ContainerManifest, error) {
-	envVars, err := pkg.GetServiceEnvironmentVariables(b.serviceRegistry, machine)
+func (b *BasicManifestFactory) MakeManifest(machine string, task api.Task) (api.ContainerManifest, error) {
+	envVars, err := GetServiceEnvironmentVariables(b.serviceRegistry, machine)
 	if err != nil {
-		return ContainerManifest{}, err
+		return api.ContainerManifest{}, err
 	}
 	for ix, container := range task.DesiredState.Manifest.Containers {
 		task.DesiredState.Manifest.Id = task.ID

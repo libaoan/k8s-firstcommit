@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-etcd/etcd"
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 	"k8s-firstcommit/pkg/client"
 	"k8s-firstcommit/pkg/util"
 )
@@ -28,7 +28,7 @@ type ReplicationManager struct {
 // An interface that knows how to add or delete tasks
 // created as an interface to allow testing.
 type TaskControlInterface interface {
-	createReplica(controllerSpec ReplicationController)
+	createReplica(controllerSpec api.ReplicationController)
 	deleteTask(taskID string) error
 }
 
@@ -36,13 +36,13 @@ type RealTaskControl struct {
 	kubeClient client.ClientInterface
 }
 
-func (r RealTaskControl) createReplica(controllerSpec ReplicationController) {
+func (r RealTaskControl) createReplica(controllerSpec api.ReplicationController) {
 	labels := controllerSpec.DesiredState.TaskTemplate.Labels
 	if labels != nil {
 		labels["replicationController"] = controllerSpec.ID
 	}
-	task := Task{
-		JSONBase: JSONBase{
+	task := api.Task{
+		JSONBase: api.JSONBase{
 			ID: fmt.Sprintf("%x", rand.Int()),
 		},
 		DesiredState: controllerSpec.DesiredState.TaskTemplate.DesiredState,
@@ -87,10 +87,10 @@ func (rm *ReplicationManager) WatchControllers() {
 	}
 }
 
-func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*ReplicationController, error) {
+func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*api.ReplicationController, error) {
 	if response.Action == "set" {
 		if response.Node != nil {
-			var controllerSpec ReplicationController
+			var controllerSpec api.ReplicationController
 			err := json.Unmarshal([]byte(response.Node.Value), &controllerSpec)
 			if err != nil {
 				return nil, err
@@ -103,8 +103,8 @@ func (rm *ReplicationManager) handleWatchResponse(response *etcd.Response) (*Rep
 	return nil, nil
 }
 
-func (rm *ReplicationManager) filterActiveTasks(tasks []Task) []Task {
-	var result []Task
+func (rm *ReplicationManager) filterActiveTasks(tasks []api.Task) []api.Task {
+	var result []api.Task
 	for _, value := range tasks {
 		if strings.Index(value.CurrentState.Status, "Exit") == -1 {
 			result = append(result, value)
@@ -113,7 +113,7 @@ func (rm *ReplicationManager) filterActiveTasks(tasks []Task) []Task {
 	return result
 }
 
-func (rm *ReplicationManager) syncReplicationController(controllerSpec ReplicationController) error {
+func (rm *ReplicationManager) syncReplicationController(controllerSpec api.ReplicationController) error {
 	rm.updateLock.Lock()
 	taskList, err := rm.kubeClient.ListTasks(controllerSpec.DesiredState.ReplicasInSet)
 	if err != nil {
@@ -153,7 +153,7 @@ func (rm *ReplicationManager) Synchronize() {
 		// sooner rather than later.
 		if response != nil && response.Node != nil && response.Node.Nodes != nil {
 			for _, value := range response.Node.Nodes {
-				var controllerSpec ReplicationController
+				var controllerSpec api.ReplicationController
 				err := json.Unmarshal([]byte(value.Value), &controllerSpec)
 				if err != nil {
 					log.Printf("Unexpected error: %#v", err)

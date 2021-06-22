@@ -3,22 +3,21 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"net/url"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 	"k8s-firstcommit/pkg/apiserver"
 	"k8s-firstcommit/pkg/client"
 )
 
 // TaskRegistryStorage implements the RESTStorage interface in terms of a TaskRegistry
 type TaskRegistryStorage struct {
-	registry      pkg.TaskRegistry
+	registry      TaskRegistry
 	containerInfo client.ContainerInfo
-	scheduler     pkg.Scheduler
+	scheduler     Scheduler
 }
 
-func MakeTaskRegistryStorage(registry pkg.TaskRegistry, containerInfo client.ContainerInfo, scheduler pkg.Scheduler) apiserver.RESTStorage {
+func MakeTaskRegistryStorage(registry TaskRegistry, containerInfo client.ContainerInfo, scheduler Scheduler) apiserver.RESTStorage {
 	return &TaskRegistryStorage{
 		registry:      registry,
 		containerInfo: containerInfo,
@@ -27,7 +26,7 @@ func MakeTaskRegistryStorage(registry pkg.TaskRegistry, containerInfo client.Con
 }
 
 // LabelMatch tests to see if a Task's labels map contains 'key' mapping to 'value'
-func LabelMatch(task Task, queryKey, queryValue string) bool {
+func LabelMatch(task api.Task, queryKey, queryValue string) bool {
 	for key, value := range task.Labels {
 		if queryKey == key && queryValue == value {
 			return true
@@ -37,7 +36,7 @@ func LabelMatch(task Task, queryKey, queryValue string) bool {
 }
 
 // LabelMatch tests to see if a Task's labels map contains all key/value pairs in 'labelQuery'
-func LabelsMatch(task Task, labelQuery *map[string]string) bool {
+func LabelsMatch(task api.Task, labelQuery *map[string]string) bool {
 	if labelQuery == nil {
 		return true
 	}
@@ -50,7 +49,7 @@ func LabelsMatch(task Task, labelQuery *map[string]string) bool {
 }
 
 func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
-	var result TaskList
+	var result api.TaskList
 	var query *map[string]string
 	if url != nil {
 		queryMap := client.DecodeLabelQuery(url.Query().Get("labels"))
@@ -58,7 +57,7 @@ func (storage *TaskRegistryStorage) List(url *url.URL) (interface{}, error) {
 	}
 	tasks, err := storage.registry.ListTasks(query)
 	if err == nil {
-		result = TaskList{
+		result = api.TaskList{
 			Items: tasks,
 		}
 	}
@@ -83,13 +82,13 @@ func (storage *TaskRegistryStorage) Delete(id string) error {
 }
 
 func (storage *TaskRegistryStorage) Extract(body string) (interface{}, error) {
-	task := Task{}
+	task := api.Task{}
 	err := json.Unmarshal([]byte(body), &task)
 	return task, err
 }
 
 func (storage *TaskRegistryStorage) Create(task interface{}) error {
-	taskObj := task.(Task)
+	taskObj := task.(api.Task)
 	if len(taskObj.ID) == 0 {
 		return fmt.Errorf("ID is unspecified: %#v", task)
 	}
@@ -101,5 +100,5 @@ func (storage *TaskRegistryStorage) Create(task interface{}) error {
 }
 
 func (storage *TaskRegistryStorage) Update(task interface{}) error {
-	return storage.registry.UpdateTask(task.(Task))
+	return storage.registry.UpdateTask(task.(api.Task))
 }

@@ -2,29 +2,29 @@ package registry
 
 import (
 	"encoding/json"
-	"k8s-firstcommit/pkg"
+
 	"net/url"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 	"k8s-firstcommit/pkg/apiserver"
 )
 
 // Implementation of RESTStorage for the api server.
 type ControllerRegistryStorage struct {
-	registry pkg.ControllerRegistry
+	registry ControllerRegistry
 }
 
-func MakeControllerRegistryStorage(registry pkg.ControllerRegistry) apiserver.RESTStorage {
+func MakeControllerRegistryStorage(registry ControllerRegistry) apiserver.RESTStorage {
 	return &ControllerRegistryStorage{
 		registry: registry,
 	}
 }
 
 func (storage *ControllerRegistryStorage) List(*url.URL) (interface{}, error) {
-	var result ReplicationControllerList
+	var result api.ReplicationControllerList
 	controllers, err := storage.registry.ListControllers()
 	if err == nil {
-		result = ReplicationControllerList{
+		result = api.ReplicationControllerList{
 			Items: controllers,
 		}
 	}
@@ -40,15 +40,15 @@ func (storage *ControllerRegistryStorage) Delete(id string) error {
 }
 
 func (storage *ControllerRegistryStorage) Extract(body string) (interface{}, error) {
-	result := ReplicationController{}
+	result := api.ReplicationController{}
 	err := json.Unmarshal([]byte(body), &result)
 	return result, err
 }
 
 func (storage *ControllerRegistryStorage) Create(controller interface{}) error {
-	return storage.registry.CreateController(controller.(ReplicationController))
+	return storage.registry.CreateController(controller.(api.ReplicationController))
 }
 
 func (storage *ControllerRegistryStorage) Update(controller interface{}) error {
-	return storage.registry.UpdateController(controller.(ReplicationController))
+	return storage.registry.UpdateController(controller.(api.ReplicationController))
 }

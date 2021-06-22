@@ -2,15 +2,14 @@ package registry
 
 import (
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"math/rand"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
 // Scheduler is an interface implemented by things that know how to schedule tasks onto machines.
 type Scheduler interface {
-	Schedule(Task) (string, error)
+	Schedule(api.Task) (string, error)
 }
 
 // RandomScheduler choses machines uniformly at random.
@@ -26,7 +25,7 @@ func MakeRandomScheduler(machines []string, random rand.Rand) Scheduler {
 	}
 }
 
-func (s *RandomScheduler) Schedule(task Task) (string, error) {
+func (s *RandomScheduler) Schedule(task api.Task) (string, error) {
 	return s.machines[s.random.Int()%len(s.machines)], nil
 }
 
@@ -43,7 +42,7 @@ func MakeRoundRobinScheduler(machines []string) Scheduler {
 	}
 }
 
-func (s *RoundRobinScheduler) Schedule(task Task) (string, error) {
+func (s *RoundRobinScheduler) Schedule(task api.Task) (string, error) {
 	result := s.machines[s.currentIndex]
 	s.currentIndex = (s.currentIndex + 1) % len(s.machines)
 	return result, nil
@@ -51,17 +50,17 @@ func (s *RoundRobinScheduler) Schedule(task Task) (string, error) {
 
 type FirstFitScheduler struct {
 	machines []string
-	registry pkg.TaskRegistry
+	registry TaskRegistry
 }
 
-func MakeFirstFitScheduler(machines []string, registry pkg.TaskRegistry) Scheduler {
+func MakeFirstFitScheduler(machines []string, registry TaskRegistry) Scheduler {
 	return &FirstFitScheduler{
 		machines: machines,
 		registry: registry,
 	}
 }
 
-func (s *FirstFitScheduler) containsPort(task Task, port Port) bool {
+func (s *FirstFitScheduler) containsPort(task api.Task, port api.Port) bool {
 	for _, container := range task.DesiredState.Manifest.Containers {
 		for _, taskPort := range container.Ports {
 			if taskPort.HostPort == port.HostPort {
@@ -72,8 +71,8 @@ func (s *FirstFitScheduler) containsPort(task Task, port Port) bool {
 	return false
 }
 
-func (s *FirstFitScheduler) Schedule(task Task) (string, error) {
-	machineToTasks := map[string][]Task{}
+func (s *FirstFitScheduler) Schedule(task api.Task) (string, error) {
+	machineToTasks := map[string][]api.Task{}
 	tasks, err := s.registry.ListTasks(nil)
 	if err != nil {
 		return "", err

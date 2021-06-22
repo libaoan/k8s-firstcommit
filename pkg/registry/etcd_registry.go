@@ -3,12 +3,11 @@ package registry
 import (
 	"encoding/json"
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"log"
 
 	"github.com/coreos/go-etcd/etcd"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in tasks are reflected into
@@ -30,7 +29,7 @@ type EtcdClient interface {
 type EtcdRegistry struct {
 	etcdClient      EtcdClient
 	machines        []string
-	manifestFactory pkg.ManifestFactory
+	manifestFactory ManifestFactory
 }
 
 // MakeEtcdRegistry creates an etcd registry.
@@ -42,7 +41,7 @@ func MakeEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
 		etcdClient: client,
 		machines:   machines,
 	}
-	registry.manifestFactory = &pkg.BasicManifestFactory{
+	registry.manifestFactory = &BasicManifestFactory{
 		serviceRegistry: registry,
 	}
 	return registry
@@ -52,15 +51,15 @@ func makeTaskKey(machine, taskID string) string {
 	return "/registry/hosts/" + machine + "/tasks/" + taskID
 }
 
-func (registry *EtcdRegistry) ListTasks(query *map[string]string) ([]Task, error) {
-	tasks := []Task{}
+func (registry *EtcdRegistry) ListTasks(query *map[string]string) ([]api.Task, error) {
+	tasks := []api.Task{}
 	for _, machine := range registry.machines {
 		machineTasks, err := registry.listTasksForMachine(machine)
 		if err != nil {
 			return tasks, err
 		}
 		for _, task := range machineTasks {
-			if pkg.LabelsMatch(task, query) {
+			if LabelsMatch(task, query) {
 				tasks = append(tasks, task)
 			}
 		}
@@ -81,12 +80,12 @@ func (registry *EtcdRegistry) listEtcdNode(key string) ([]*etcd.Node, error) {
 	return result.Node.Nodes, nil
 }
 
-func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]Task, error) {
-	tasks := []Task{}
+func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]api.Task, error) {
+	tasks := []api.Task{}
 	key := "/registry/hosts/" + machine + "/tasks"
 	nodes, err := registry.listEtcdNode(key)
 	for _, node := range nodes {
-		task := Task{}
+		task := api.Task{}
 		err = json.Unmarshal([]byte(node.Value), &task)
 		if err != nil {
 			return tasks, err
@@ -97,7 +96,7 @@ func (registry *EtcdRegistry) listTasksForMachine(machine string) ([]Task, error
 	return tasks, err
 }
 
-func (registry *EtcdRegistry) GetTask(taskID string) (*Task, error) {
+func (registry *EtcdRegistry) GetTask(taskID string) (*api.Task, error) {
 	task, _, err := registry.findTask(taskID)
 	return &task, err
 }
@@ -106,14 +105,14 @@ func makeContainerKey(machine string) string {
 	return "/registry/hosts/" + machine + "/kubelet"
 }
 
-func (registry *EtcdRegistry) loadManifests(machine string) ([]ContainerManifest, error) {
-	var manifests []ContainerManifest
+func (registry *EtcdRegistry) loadManifests(machine string) ([]api.ContainerManifest, error) {
+	var manifests []api.ContainerManifest
 	response, err := registry.etcdClient.Get(makeContainerKey(machine), false, false)
 
 	if err != nil {
 		if isEtcdNotFound(err) {
 			err = nil
-			manifests = []ContainerManifest{}
+			manifests = []api.ContainerManifest{}
 		}
 	} else {
 		err = json.Unmarshal([]byte(response.Node.Value), &manifests)
@@ -121,7 +120,7 @@ func (registry *EtcdRegistry) loadManifests(machine string) ([]ContainerManifest
 	return manifests, err
 }
 
-func (registry *EtcdRegistry) updateManifests(machine string, manifests []ContainerManifest) error {
+func (registry *EtcdRegistry) updateManifests(machine string, manifests []api.ContainerManifest) error {
 	containerData, err := json.Marshal(manifests)
 	if err != nil {
 		return err
@@ -130,7 +129,7 @@ func (registry *EtcdRegistry) updateManifests(machine string, manifests []Contai
 	return err
 }
 
-func (registry *EtcdRegistry) CreateTask(machineIn string, task Task) error {
+func (registry *EtcdRegistry) CreateTask(machineIn string, task api.Task) error {
 	taskOut, machine, err := registry.findTask(task.ID)
 	if err == nil {
 		return fmt.Errorf("A task named %s already exists on %s (%#v)", task.ID, machine, taskOut)
@@ -138,7 +137,7 @@ func (registry *EtcdRegistry) CreateTask(machineIn string, task Task) error {
 	return registry.runTask(task, machineIn)
 }
 
-func (registry *EtcdRegistry) runTask(task Task, machine string) error {
+func (registry *EtcdRegistry) runTask(task api.Task, machine string) error {
 	manifests, err := registry.loadManifests(machine)
 	if err != nil {
 		return err
@@ -159,7 +158,7 @@ func (registry *EtcdRegistry) runTask(task Task, machine string) error {
 	return registry.updateManifests(machine, manifests)
 }
 
-func (registry *EtcdRegistry) UpdateTask(task Task) error {
+func (registry *EtcdRegistry) UpdateTask(task api.Task) error {
 	return fmt.Errorf("Unimplemented!")
 }
 
@@ -176,7 +175,7 @@ func (registry *EtcdRegistry) deleteTaskFromMachine(machine, taskID string) erro
 	if err != nil {
 		return err
 	}
-	newManifests := make([]ContainerManifest, 0)
+	newManifests := make([]api.ContainerManifest, 0)
 	found := false
 	for _, manifest := range manifests {
 		if manifest.Id != taskID {
@@ -199,33 +198,33 @@ func (registry *EtcdRegistry) deleteTaskFromMachine(machine, taskID string) erro
 	return err
 }
 
-func (registry *EtcdRegistry) getTaskForMachine(machine, taskID string) (Task, error) {
+func (registry *EtcdRegistry) getTaskForMachine(machine, taskID string) (api.Task, error) {
 	key := makeTaskKey(machine, taskID)
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
 		if isEtcdNotFound(err) {
-			return Task{}, fmt.Errorf("Not found (%#v).", err)
+			return api.Task{}, fmt.Errorf("Not found (%#v).", err)
 		} else {
-			return Task{}, err
+			return api.Task{}, err
 		}
 	}
 	if result.Node == nil || len(result.Node.Value) == 0 {
-		return Task{}, fmt.Errorf("no nodes field: %#v", result)
+		return api.Task{}, fmt.Errorf("no nodes field: %#v", result)
 	}
-	task := Task{}
+	task := api.Task{}
 	err = json.Unmarshal([]byte(result.Node.Value), &task)
 	task.CurrentState.Host = machine
 	return task, err
 }
 
-func (registry *EtcdRegistry) findTask(taskID string) (Task, string, error) {
+func (registry *EtcdRegistry) findTask(taskID string) (api.Task, string, error) {
 	for _, machine := range registry.machines {
 		task, err := registry.getTaskForMachine(machine, taskID)
 		if err == nil {
 			return task, machine, nil
 		}
 	}
-	return Task{}, "", fmt.Errorf("Task not found %s", taskID)
+	return api.Task{}, "", fmt.Errorf("Task not found %s", taskID)
 }
 
 func isEtcdNotFound(err error) bool {
@@ -245,12 +244,12 @@ func isEtcdNotFound(err error) bool {
 	return false
 }
 
-func (registry *EtcdRegistry) ListControllers() ([]ReplicationController, error) {
-	var controllers []ReplicationController
+func (registry *EtcdRegistry) ListControllers() ([]api.ReplicationController, error) {
+	var controllers []api.ReplicationController
 	key := "/registry/controllers"
 	nodes, err := registry.listEtcdNode(key)
 	for _, node := range nodes {
-		var controller ReplicationController
+		var controller api.ReplicationController
 		err = json.Unmarshal([]byte(node.Value), &controller)
 		if err != nil {
 			return controllers, err
@@ -264,8 +263,8 @@ func makeControllerKey(id string) string {
 	return "/registry/controllers/" + id
 }
 
-func (registry *EtcdRegistry) GetController(controllerID string) (*ReplicationController, error) {
-	var controller ReplicationController
+func (registry *EtcdRegistry) GetController(controllerID string) (*api.ReplicationController, error) {
+	var controller api.ReplicationController
 	key := makeControllerKey(controllerID)
 	result, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
@@ -282,12 +281,12 @@ func (registry *EtcdRegistry) GetController(controllerID string) (*ReplicationCo
 	return &controller, err
 }
 
-func (registry *EtcdRegistry) CreateController(controller ReplicationController) error {
+func (registry *EtcdRegistry) CreateController(controller api.ReplicationController) error {
 	// TODO : check for existence here and error.
 	return registry.UpdateController(controller)
 }
 
-func (registry *EtcdRegistry) UpdateController(controller ReplicationController) error {
+func (registry *EtcdRegistry) UpdateController(controller api.ReplicationController) error {
 	controllerData, err := json.Marshal(controller)
 	if err != nil {
 		return err
@@ -307,25 +306,25 @@ func makeServiceKey(name string) string {
 	return "/registry/services/specs/" + name
 }
 
-func (registry *EtcdRegistry) ListServices() (ServiceList, error) {
+func (registry *EtcdRegistry) ListServices() (api.ServiceList, error) {
 	nodes, err := registry.listEtcdNode("/registry/services/specs")
 	if err != nil {
-		return ServiceList{}, err
+		return api.ServiceList{}, err
 	}
 
-	var services []Service
+	var services []api.Service
 	for _, node := range nodes {
-		var svc Service
+		var svc api.Service
 		err := json.Unmarshal([]byte(node.Value), &svc)
 		if err != nil {
-			return ServiceList{}, err
+			return api.ServiceList{}, err
 		}
 		services = append(services, svc)
 	}
-	return ServiceList{Items: services}, nil
+	return api.ServiceList{Items: services}, nil
 }
 
-func (registry *EtcdRegistry) CreateService(svc Service) error {
+func (registry *EtcdRegistry) CreateService(svc api.Service) error {
 	key := makeServiceKey(svc.ID)
 	data, err := json.Marshal(svc)
 	if err != nil {
@@ -335,7 +334,7 @@ func (registry *EtcdRegistry) CreateService(svc Service) error {
 	return err
 }
 
-func (registry *EtcdRegistry) GetService(name string) (*Service, error) {
+func (registry *EtcdRegistry) GetService(name string) (*api.Service, error) {
 	key := makeServiceKey(name)
 	response, err := registry.etcdClient.Get(key, false, false)
 	if err != nil {
@@ -345,7 +344,7 @@ func (registry *EtcdRegistry) GetService(name string) (*Service, error) {
 			return nil, err
 		}
 	}
-	var svc Service
+	var svc api.Service
 	err = json.Unmarshal([]byte(response.Node.Value), &svc)
 	if err != nil {
 		return nil, err
@@ -364,11 +363,11 @@ func (registry *EtcdRegistry) DeleteService(name string) error {
 	return err
 }
 
-func (registry *EtcdRegistry) UpdateService(svc Service) error {
+func (registry *EtcdRegistry) UpdateService(svc api.Service) error {
 	return registry.CreateService(svc)
 }
 
-func (registry *EtcdRegistry) UpdateEndpoints(e Endpoints) error {
+func (registry *EtcdRegistry) UpdateEndpoints(e api.Endpoints) error {
 	data, err := json.Marshal(e)
 	if err != nil {
 		return err

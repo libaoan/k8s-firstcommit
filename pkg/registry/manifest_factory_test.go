@@ -1,31 +1,30 @@
 package registry
 
 import (
-	"k8s-firstcommit/pkg"
 	"testing"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
 func TestMakeManifestNoServices(t *testing.T) {
-	registry := pkg.MockServiceRegistry{}
-	factory := &pkg.BasicManifestFactory{
+	registry := MockServiceRegistry{}
+	factory := &BasicManifestFactory{
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Task{
-		JSONBase: JSONBase{ID: "foobar"},
-		DesiredState: TaskState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
-					Container{
+	manifest, err := factory.MakeManifest("machine", api.Task{
+		JSONBase: api.JSONBase{ID: "foobar"},
+		DesiredState: api.TaskState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
+					api.Container{
 						Name: "foo",
 					},
 				},
 			},
 		},
 	})
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 	container := manifest.Containers[0]
 	if len(container.Env) != 1 ||
 		container.Env[0].Name != "SERVICE_HOST" ||
@@ -38,32 +37,32 @@ func TestMakeManifestNoServices(t *testing.T) {
 }
 
 func TestMakeManifestServices(t *testing.T) {
-	registry := pkg.MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
-				Service{
-					JSONBase: JSONBase{ID: "test"},
+	registry := MockServiceRegistry{
+		list: api.ServiceList{
+			Items: []api.Service{
+				api.Service{
+					JSONBase: api.JSONBase{ID: "test"},
 					Port:     8080,
 				},
 			},
 		},
 	}
-	factory := &pkg.BasicManifestFactory{
+	factory := &BasicManifestFactory{
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Task{
-		DesiredState: TaskState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
-					Container{
+	manifest, err := factory.MakeManifest("machine", api.Task{
+		DesiredState: api.TaskState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
+					api.Container{
 						Name: "foo",
 					},
 				},
 			},
 		},
 	})
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 	container := manifest.Containers[0]
 	if len(container.Env) != 2 ||
 		container.Env[0].Name != "TEST_SERVICE_PORT" ||
@@ -75,27 +74,27 @@ func TestMakeManifestServices(t *testing.T) {
 }
 
 func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
-	registry := pkg.MockServiceRegistry{
-		list: ServiceList{
-			Items: []Service{
-				Service{
-					JSONBase: JSONBase{ID: "test"},
+	registry := MockServiceRegistry{
+		list: api.ServiceList{
+			Items: []api.Service{
+				api.Service{
+					JSONBase: api.JSONBase{ID: "test"},
 					Port:     8080,
 				},
 			},
 		},
 	}
-	factory := &pkg.BasicManifestFactory{
+	factory := &BasicManifestFactory{
 		serviceRegistry: &registry,
 	}
 
-	manifest, err := factory.MakeManifest("machine", Task{
-		DesiredState: TaskState{
-			Manifest: ContainerManifest{
-				Containers: []Container{
-					Container{
-						Env: []EnvVar{
-							EnvVar{
+	manifest, err := factory.MakeManifest("machine", api.Task{
+		DesiredState: api.TaskState{
+			Manifest: api.ContainerManifest{
+				Containers: []api.Container{
+					api.Container{
+						Env: []api.EnvVar{
+							api.EnvVar{
 								Name:  "foo",
 								Value: "bar",
 							},
@@ -105,7 +104,7 @@ func TestMakeManifestServicesExistingEnvVar(t *testing.T) {
 			},
 		},
 	})
-	pkg.expectNoError(t, err)
+	expectNoError(t, err)
 	container := manifest.Containers[0]
 	if len(container.Env) != 3 ||
 		container.Env[0].Name != "foo" ||

@@ -2,7 +2,6 @@ package registry
 
 import (
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"testing"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -63,10 +62,10 @@ func (f *FakeEtcdClient) Watch(prefix string, waitIndex uint64, recursive bool, 
 	return nil, fmt.Errorf("Unimplemented")
 }
 
-func MakeTestEtcdRegistry(client pkg.EtcdClient, machines []string) *pkg.EtcdRegistry {
-	registry := pkg.MakeEtcdRegistry(client, machines)
-	registry.manifestFactory = &pkg.BasicManifestFactory{
-		serviceRegistry: &pkg.MockServiceRegistry{},
+func MakeTestEtcdRegistry(client EtcdClient, machines []string) *EtcdRegistry {
+	registry := MakeEtcdRegistry(client, machines)
+	registry.manifestFactory = &BasicManifestFactory{
+		serviceRegistry: &MockServiceRegistry{},
 	}
 	return registry
 }

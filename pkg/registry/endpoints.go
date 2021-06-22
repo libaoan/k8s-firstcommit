@@ -2,13 +2,12 @@ package registry
 
 import (
 	"fmt"
-	"k8s-firstcommit/pkg"
 	"log"
 
-	. "k8s-firstcommit/pkg/api"
+	"k8s-firstcommit/pkg/api"
 )
 
-func MakeEndpointController(serviceRegistry pkg.ServiceRegistry, taskRegistry pkg.TaskRegistry) *EndpointController {
+func MakeEndpointController(serviceRegistry ServiceRegistry, taskRegistry TaskRegistry) *EndpointController {
 	return &EndpointController{
 		serviceRegistry: serviceRegistry,
 		taskRegistry:    taskRegistry,
@@ -16,8 +15,8 @@ func MakeEndpointController(serviceRegistry pkg.ServiceRegistry, taskRegistry pk
 }
 
 type EndpointController struct {
-	serviceRegistry pkg.ServiceRegistry
-	taskRegistry    pkg.TaskRegistry
+	serviceRegistry ServiceRegistry
+	taskRegistry    TaskRegistry
 }
 
 func (e *EndpointController) SyncServiceEndpoints() error {
@@ -38,7 +37,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			// TODO: Use port names in the service object, don't just use port #0
 			endpoints[ix] = fmt.Sprintf("%s:%d", task.CurrentState.Host, task.DesiredState.Manifest.Containers[0].Ports[0].HostPort)
 		}
-		err = e.serviceRegistry.UpdateEndpoints(Endpoints{
+		err = e.serviceRegistry.UpdateEndpoints(api.Endpoints{
 			Name:      service.ID,
 			Endpoints: endpoints,
 		})
